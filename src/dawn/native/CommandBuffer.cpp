@@ -27,6 +27,8 @@
 
 #include "src/dawn/native/CommandBuffer.h"
 
+#include <bit>
+
 #include "dawn/native/ObjectType_autogen.h"
 #include "src/dawn/native/Buffer.h"
 #include "src/dawn/native/CommandEncoder.h"
@@ -170,6 +172,10 @@ MaybeError LazyClearRenderPassAttachments(DeviceBase* device,
     // Detect if a renderArea has been set that only covers part of the render pass attachments.
     // If so we'll be expanding the renderArea to full dimensions to enforce native driver clears
     // for any uninitialized attachments below, while preserving dynamic scissor clipping.
+    // Multiview attachments have one layer per view.
+    const uint32_t viewMask = renderPass->attachmentState->GetViewMask();
+    const uint32_t viewCount = viewMask != 0 ? static_cast<uint32_t>(std::popcount(viewMask)) : 1u;
+
     bool partialRenderArea = (renderPass->renderArea.x != 0 || renderPass->renderArea.y != 0 ||
                               renderPass->renderArea.width != renderPass->width ||
                               renderPass->renderArea.height != renderPass->height);
@@ -179,7 +185,7 @@ MaybeError LazyClearRenderPassAttachments(DeviceBase* device,
         TextureViewBase* view = attachmentInfo.view.Get();
         bool hasResolveTarget = attachmentInfo.resolveTarget != nullptr;
 
-        DAWN_CHECK(view->GetLayerCount() == 1);
+        DAWN_CHECK(view->GetLayerCount() == viewCount);
         DAWN_CHECK(view->GetLevelCount() == 1);
         SubresourceRange range = view->GetSubresourceRange();
         TextureBase* texture = view->GetTexture();
@@ -241,7 +247,7 @@ MaybeError LazyClearRenderPassAttachments(DeviceBase* device,
     if (renderPass->attachmentState->HasDepthStencilAttachment()) {
         auto& attachmentInfo = renderPass->depthStencilAttachment;
         TextureViewBase* view = attachmentInfo.view.Get();
-        DAWN_CHECK(view->GetLayerCount() == 1);
+        DAWN_CHECK(view->GetLayerCount() == viewCount);
         DAWN_CHECK(view->GetLevelCount() == 1);
         SubresourceRange range = view->GetSubresourceRange();
 
@@ -288,7 +294,7 @@ MaybeError LazyClearRenderPassAttachments(DeviceBase* device,
                 continue;
             }
 
-            DAWN_CHECK(view->GetLayerCount() == 1);
+            DAWN_CHECK(view->GetLayerCount() == viewCount);
             DAWN_CHECK(view->GetLevelCount() == 1);
             const SubresourceRange& range = view->GetSubresourceRange();
 
