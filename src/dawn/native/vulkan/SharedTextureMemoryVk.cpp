@@ -992,6 +992,49 @@ ResultOrError<Ref<SharedTextureMemory>> SharedTextureMemory::Create(
 }
 
 // static
+ResultOrError<Ref<SharedTextureMemory>> SharedTextureMemory::CreateFromVkImage(
+    Device* device,
+    StringView label,
+    VkImage image,
+    const VkImageCreateInfo* info) {
+    DAWN_INVALID_IF(image == VK_NULL_HANDLE, "image is VK_NULL_HANDLE.");
+    DAWN_INVALID_IF(info == nullptr || info->sType != VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                    "info is not a VkImageCreateInfo.");
+    DAWN_INVALID_IF(info->imageType != VK_IMAGE_TYPE_2D || info->mipLevels != 1 ||
+                        info->samples != VK_SAMPLE_COUNT_1_BIT,
+                    "Only single-sampled 2D images without mips can be wrapped.");
+
+    SharedTextureMemoryProperties properties{};
+    properties.size = {info->extent.width, info->extent.height,
+                       std::max(info->arrayLayers, info->extent.depth)};
+    DAWN_TRY_ASSIGN(properties.format, FormatFromVkFormat(device, info->format));
+    if (info->usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) {
+        properties.usage |= wgpu::TextureUsage::CopySrc;
+    }
+    if (info->usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT) {
+        properties.usage |= wgpu::TextureUsage::CopyDst;
+    }
+    if (info->usage & VK_IMAGE_USAGE_SAMPLED_BIT) {
+        properties.usage |= wgpu::TextureUsage::TextureBinding;
+    }
+    if (info->usage & VK_IMAGE_USAGE_STORAGE_BIT) {
+        properties.usage |= wgpu::TextureUsage::StorageBinding;
+    }
+    if (info->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
+        properties.usage |= wgpu::TextureUsage::RenderAttachment;
+    }
+
+    // The image already lives in Dawn's queue family: access barriers are layout transitions
+    // only, with no ownership transfer.
+    Ref<SharedTextureMemory> sharedTextureMemory =
+        SharedTextureMemory::Create(device, label, properties, device->GetGraphicsQueueFamily());
+    sharedTextureMemory->APIGetProperties(&properties);
+    sharedTextureMemory->mVkImage =
+        AcquireRef(new RefCountedVkHandle<VkImage>(device, image, /*owned=*/false));
+    return sharedTextureMemory;
+}
+
+// static
 Ref<SharedTextureMemory> SharedTextureMemory::Create(
     Device* device,
     StringView label,

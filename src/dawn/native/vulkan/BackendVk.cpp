@@ -537,8 +537,15 @@ ResultOrError<VulkanGlobalKnobs> VulkanInstance::CreateVkInstance(const Instance
         createInfoChain.Add(&validationFeatures, VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT);
     }
 
-    DAWN_TRY(CheckVkSuccess(mFunctions.CreateInstance(&createInfo, nullptr, &mInstance),
-                            "vkCreateInstance"));
+    if (const ExternalVulkanHooks* hooks = GetExternalVulkanHooks();
+        hooks != nullptr && hooks->createInstance != nullptr) {
+        DAWN_TRY(CheckVkSuccess(hooks->createInstance(hooks->userdata, mFunctions.GetInstanceProcAddr,
+                                                      &createInfo, &mInstance),
+                                "vkCreateInstance (external hook)"));
+    } else {
+        DAWN_TRY(CheckVkSuccess(mFunctions.CreateInstance(&createInfo, nullptr, &mInstance),
+                                "vkCreateInstance"));
+    }
     DAWN_INVALID_IF(mInstance == VK_NULL_HANDLE, "Failed to create VkInstance");
 
     return usedKnobs;
@@ -628,7 +635,16 @@ std::vector<Ref<PhysicalDeviceBase>> Backend::DiscoverPhysicalDevices(
 
             const std::vector<VkPhysicalDevice>& vkPhysicalDevices =
                 mVulkanInstances[icd]->GetVkPhysicalDevices();
+            const ExternalVulkanHooks* hooks = GetExternalVulkanHooks();
+            const VkPhysicalDevice required =
+                hooks != nullptr && hooks->getPhysicalDevice != nullptr
+                    ? hooks->getPhysicalDevice(hooks->userdata,
+                                               mVulkanInstances[icd]->GetVkInstance())
+                    : VkPhysicalDevice(VK_NULL_HANDLE);
             for (VkPhysicalDevice vkPhysicalDevice : vkPhysicalDevices) {
+                if (required != VK_NULL_HANDLE && vkPhysicalDevice != required) {
+                    continue;
+                }
                 Ref<PhysicalDevice> physicalDevice =
                     AcquireRef(new PhysicalDevice(mVulkanInstances[icd].Get(), vkPhysicalDevice));
                 if (instance->ConsumedErrorAndWarnOnce(physicalDevice->Initialize())) {

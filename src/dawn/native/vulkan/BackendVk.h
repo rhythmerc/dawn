@@ -44,6 +44,10 @@
 
 namespace dawn::native::vulkan {
 
+struct ExternalVulkanHooks;
+// melee-xr fork: SetExternalVulkanHooks (VulkanBackend.cpp); null when unset.
+const ExternalVulkanHooks* GetExternalVulkanHooks();
+
 // The required version of Vulkan the driver must support in order for Dawn to use the Vulkan
 // backend. If this value is updated ensure that appropriate adjustments are made to
 // VulkanExtensions.h/cpp and VulkanFunctions.h/cpp.

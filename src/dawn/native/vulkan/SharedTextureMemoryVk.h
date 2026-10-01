@@ -68,6 +68,13 @@ class SharedTextureMemory final : public SharedTextureMemoryBase {
         StringView label,
         const SharedTextureMemoryOpaqueFDDescriptor* descriptor);
 
+    // melee-xr fork: wraps an image created elsewhere on this device (never destroyed by
+    // Dawn); see CreateSharedTextureMemoryFromVkImage in VulkanBackend.h.
+    static ResultOrError<Ref<SharedTextureMemory>> CreateFromVkImage(Device* device,
+                                                                     StringView label,
+                                                                     VkImage image,
+                                                                     const VkImageCreateInfo* info);
+
     RefCountedVkHandle<VkDeviceMemory>* GetVkDeviceMemory() const;
     RefCountedVkHandle<VkImage>* GetVkImage() const;
     uint32_t GetQueueFamilyIndex() const;

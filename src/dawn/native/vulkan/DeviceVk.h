@@ -82,6 +82,8 @@ class Device final : public DeviceBase {
     const VulkanGlobalInfo& GetGlobalInfo() const;
     VkDevice GetVkDevice() const;
     uint32_t GetGraphicsQueueFamily() const;
+    // melee-xr fork: queues created for the caller after Dawn's (ExternalVulkanHooks).
+    uint32_t GetExtraQueueCount() const { return mExtraQueueCount; }
     const VkDescriptorSetLayout& GetResourceTableLayout() const;
     FramebufferFetchHelper* GetFramebufferFetchHelper();
 
@@ -220,6 +222,7 @@ class Device final : public DeviceBase {
     VulkanDeviceInfo mDeviceInfo = {};
     VkDevice mVkDevice = VK_NULL_HANDLE;
     uint32_t mMainQueueFamily = 0;
+    uint32_t mExtraQueueCount = 0;
 
     VkDescriptorSetLayout mResourceTableLayout = VK_NULL_HANDLE;
     std::unique_ptr<FramebufferFetchHelper> mFramebufferFetchHelper;

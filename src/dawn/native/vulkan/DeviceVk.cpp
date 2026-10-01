@@ -28,6 +28,7 @@
 #include "src/dawn/native/vulkan/DeviceVk.h"
 
 #include <algorithm>
+#include <array>
 #include <utility>
 
 #include "dawn/dawn_version.h"
@@ -748,17 +749,24 @@ ResultOrError<VulkanDeviceKnobs> Device::CreateDevice(VkPhysicalDevice vkPhysica
         mMainQueueFamily = universalQueueFamily;
     }
 
-    // Choose to create a single universal queue
+    // Choose to create a single universal queue, plus any extra queues in the same family the
+    // caller asked for (melee-xr fork: ExternalVulkanHooks::extraQueueCount).
+    const ExternalVulkanHooks* hooks = GetExternalVulkanHooks();
     std::vector<VkDeviceQueueCreateInfo> queuesToRequest;
-    float zero = 0.0f;
+    std::array<float, 8> zeros{};
     {
+        const uint32_t available = mDeviceInfo.queueFamilies[mMainQueueFamily].queueCount;
+        const uint32_t wanted = hooks != nullptr ? hooks->extraQueueCount : 0;
+        mExtraQueueCount = std::min({wanted, available > 0 ? available - 1 : 0u,
+                                     static_cast<uint32_t>(zeros.size()) - 1});
+
         VkDeviceQueueCreateInfo queueCreateInfo;
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.pNext = nullptr;
         queueCreateInfo.flags = 0;
         queueCreateInfo.queueFamilyIndex = static_cast<uint32_t>(mMainQueueFamily);
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &zero;
+        queueCreateInfo.queueCount = 1 + mExtraQueueCount;
+        queueCreateInfo.pQueuePriorities = zeros.data();
 
         queuesToRequest.push_back(queueCreateInfo);
     }
@@ -777,8 +785,14 @@ ResultOrError<VulkanDeviceKnobs> Device::CreateDevice(VkPhysicalDevice vkPhysica
     createInfo.ppEnabledExtensionNames = extensionNames.data();
     createInfo.pEnabledFeatures = nullptr;
 
-    DAWN_TRY(CheckVkSuccess(fn.CreateDevice(vkPhysicalDevice, &createInfo, nullptr, &mVkDevice),
-                            "vkCreateDevice"));
+    if (hooks != nullptr && hooks->createDevice != nullptr) {
+        DAWN_TRY(CheckVkSuccess(hooks->createDevice(hooks->userdata, fn.GetInstanceProcAddr,
+                                                    vkPhysicalDevice, &createInfo, &mVkDevice),
+                                "vkCreateDevice (external hook)"));
+    } else {
+        DAWN_TRY(CheckVkSuccess(fn.CreateDevice(vkPhysicalDevice, &createInfo, nullptr, &mVkDevice),
+                                "vkCreateDevice"));
+    }
 
     return usedKnobs;
 }

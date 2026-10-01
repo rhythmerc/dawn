@@ -40,10 +40,11 @@ namespace dawn::native::vulkan {
 template <typename Handle>
 class RefCountedVkHandle : public RefCounted {
   public:
-    RefCountedVkHandle(Device* device, Handle handle) : mDevice(device), mHandle(handle) {}
+    RefCountedVkHandle(Device* device, Handle handle, bool owned = true)
+        : mDevice(device), mHandle(handle), mOwned(owned) {}
 
     ~RefCountedVkHandle() override {
-        if (mHandle != VK_NULL_HANDLE) {
+        if (mHandle != VK_NULL_HANDLE && mOwned) {
             mDevice->GetFencedDeleter()->DeleteWhenUnused(mHandle);
         }
     }
@@ -53,6 +54,7 @@ class RefCountedVkHandle : public RefCounted {
   private:
     Ref<Device> mDevice;
     Handle mHandle = VK_NULL_HANDLE;
+    bool mOwned = true;  // melee-xr fork: false for images wrapped from elsewhere
 };
 
 }  // namespace dawn::native::vulkan

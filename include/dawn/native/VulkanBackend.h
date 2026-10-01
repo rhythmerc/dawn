@@ -41,6 +41,56 @@ DAWN_NATIVE_EXPORT VkInstance GetInstance(WGPUDevice device);
 
 DAWN_NATIVE_EXPORT PFN_vkVoidFunction GetInstanceProcAddr(WGPUDevice device, const char* pName);
 
+// melee-xr fork: an OpenXR runtime creates Dawn's VkInstance and VkDevice
+// (XR_KHR_vulkan_enable2), so the app can render straight into the runtime's
+// swapchain images on Dawn's own device. Set before the backend's Vulkan
+// instance is created (the first adapter request); nullptr clears.
+struct DAWN_NATIVE_EXPORT ExternalVulkanHooks {
+    void* userdata = nullptr;
+    // Replaces vkCreateInstance; must create an instance with at least `info`.
+    VkResult (*createInstance)(void* userdata,
+                               PFN_vkGetInstanceProcAddr getInstanceProcAddr,
+                               const VkInstanceCreateInfo* info,
+                               VkInstance* instance) = nullptr;
+    // The physical device the device must live on; others are not offered as adapters.
+    VkPhysicalDevice (*getPhysicalDevice)(void* userdata, VkInstance instance) = nullptr;
+    // Replaces vkCreateDevice; must create a device with at least `info`.
+    VkResult (*createDevice)(void* userdata,
+                             PFN_vkGetInstanceProcAddr getInstanceProcAddr,
+                             VkPhysicalDevice physicalDevice,
+                             const VkDeviceCreateInfo* info,
+                             VkDevice* device) = nullptr;
+    // Extra queues created in Dawn's queue family for the caller (queue indices 1..n), if the
+    // family has them. Dawn never uses them.
+    uint32_t extraQueueCount = 0;
+};
+DAWN_NATIVE_EXPORT void SetExternalVulkanHooks(const ExternalVulkanHooks* hooks);
+
+struct DAWN_NATIVE_EXPORT DeviceVkHandles {
+    VkInstance instance = VK_NULL_HANDLE;
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    VkDevice device = VK_NULL_HANDLE;
+    uint32_t queueFamilyIndex = 0;
+    VkQueue queue = VK_NULL_HANDLE;  // Dawn's queue, index 0 of the family
+    uint32_t extraQueueCount = 0;    // extra queues created (ExternalVulkanHooks)
+    PFN_vkGetInstanceProcAddr getInstanceProcAddr = nullptr;
+};
+DAWN_NATIVE_EXPORT DeviceVkHandles GetDeviceVkHandles(WGPUDevice device);
+// The index'th extra queue (queue index 1 + index of Dawn's family), or VK_NULL_HANDLE.
+DAWN_NATIVE_EXPORT VkQueue GetExtraQueue(WGPUDevice device, uint32_t index);
+
+// Wraps an image created elsewhere on Dawn's device, e.g. an OpenXR swapchain image, as
+// SharedTextureMemory. Dawn never destroys the image or its memory. `info` describes how it was
+// created (format, extent, usage, flags). Access through BeginAccess/EndAccess with
+// SharedTextureMemoryVkImageLayoutBeginState/EndState; the image stays in Dawn's queue family.
+// `image` is the VkImage handle as an integer: Dawn's internal VkImage type differs from
+// vulkan.h's, so non-dispatchable handles cross this API untyped.
+DAWN_NATIVE_EXPORT WGPUSharedTextureMemory
+CreateSharedTextureMemoryFromVkImage(WGPUDevice device,
+                                     uint64_t image,
+                                     const VkImageCreateInfo* info,
+                                     const char* label);
+
 enum class NeedsDedicatedAllocation {
     Yes,
     No,

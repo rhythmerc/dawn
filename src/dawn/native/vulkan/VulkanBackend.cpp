@@ -28,6 +28,7 @@
 // VulkanBackend.cpp: contains the definition of symbols exported by VulkanBackend.h so that they
 // can be compiled twice: once export (shared library), once not exported (static library)
 
+#include <cstring>
 #include <utility>
 
 // Include vulkan_platform.h before VulkanBackend.h includes vulkan.h so that we use our version
@@ -36,10 +37,73 @@
 
 // Must be after vulkan_platform
 #include "dawn/native/VulkanBackend.h"
+#include "src/dawn/native/vulkan/BackendVk.h"
 #include "src/dawn/native/vulkan/DeviceVk.h"
+#include "src/dawn/native/vulkan/PhysicalDeviceVk.h"
+#include "src/dawn/native/vulkan/QueueVk.h"
+#include "src/dawn/native/vulkan/SharedTextureMemoryVk.h"
 #include "src/dawn/native/vulkan/TextureVk.h"
 
 namespace dawn::native::vulkan {
+
+namespace {
+ExternalVulkanHooks gExternalHooks;
+bool gHaveExternalHooks = false;
+}  // namespace
+
+void SetExternalVulkanHooks(const ExternalVulkanHooks* hooks) {
+    gHaveExternalHooks = hooks != nullptr;
+    gExternalHooks = hooks != nullptr ? *hooks : ExternalVulkanHooks{};
+}
+
+const ExternalVulkanHooks* GetExternalVulkanHooks() {
+    return gHaveExternalHooks ? &gExternalHooks : nullptr;
+}
+
+DeviceVkHandles GetDeviceVkHandles(WGPUDevice device) {
+    Device* backendDevice = ToBackend(FromAPI(device));
+    DeviceVkHandles handles;
+    handles.instance = backendDevice->GetVkInstance();
+    handles.physicalDevice = ToBackend(backendDevice->GetPhysicalDevice())->GetVkPhysicalDevice();
+    handles.device = backendDevice->GetVkDevice();
+    handles.queueFamilyIndex = backendDevice->GetGraphicsQueueFamily();
+    handles.queue = ToBackend(backendDevice->GetQueue())->GetVkQueue();
+    handles.extraQueueCount = backendDevice->GetExtraQueueCount();
+    handles.getInstanceProcAddr = backendDevice->fn.GetInstanceProcAddr;
+    return handles;
+}
+
+VkQueue GetExtraQueue(WGPUDevice device, uint32_t index) {
+    Device* backendDevice = ToBackend(FromAPI(device));
+    if (index >= backendDevice->GetExtraQueueCount()) {
+        return VK_NULL_HANDLE;
+    }
+    VkQueue queue = VK_NULL_HANDLE;
+    backendDevice->fn.GetDeviceQueue(backendDevice->GetVkDevice(),
+                                     backendDevice->GetGraphicsQueueFamily(), 1 + index, &queue);
+    return queue;
+}
+
+WGPUSharedTextureMemory CreateSharedTextureMemoryFromVkImage(WGPUDevice device,
+                                                             uint64_t image,
+                                                             const VkImageCreateInfo* info,
+                                                             const char* label) {
+    Device* backendDevice = ToBackend(FromAPI(device));
+    auto deviceGuard = backendDevice->GetGuard();
+    VkImage vkImage;
+    static_assert(sizeof(*vkImage) == sizeof(image));
+    std::memcpy(&*vkImage, &image, sizeof(image));  // a pointer or a uint64_t, per platform
+    Ref<SharedTextureMemory> memory;
+    if (backendDevice->ConsumedError(
+            SharedTextureMemory::CreateFromVkImage(backendDevice,
+                                                   StringView(label != nullptr ? label : ""),
+                                                   vkImage, info),
+            &memory, "calling CreateSharedTextureMemoryFromVkImage")) {
+        return nullptr;
+    }
+    Ref<SharedTextureMemoryBase> base = std::move(memory);
+    return ToAPI(ReturnToAPI(std::move(base)));
+}
 
 VkInstance GetInstance(WGPUDevice device) {
     Device* backendDevice = ToBackend(FromAPI(device));
