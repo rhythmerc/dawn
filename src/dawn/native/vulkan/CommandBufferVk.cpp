@@ -800,7 +800,8 @@ MaybeError RecordBeginDynamicRenderPass(CommandRecordingContext* recordingContex
     VkExtent2D granularity{32, 32};
     renderInfo.renderArea = GetAlignedRenderArea(granularity, renderPass);
     renderInfo.layerCount = 1;
-    renderInfo.viewMask = 0;
+    // Multiview: draws go to every view in the mask (one attachment layer each).
+    renderInfo.viewMask = renderPass->attachmentState->GetViewMask();
     renderInfo.pDepthAttachment = nullptr;
     renderInfo.pStencilAttachment = nullptr;
 

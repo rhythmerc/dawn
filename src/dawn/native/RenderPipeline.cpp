@@ -883,6 +883,17 @@ MaybeError ValidateRenderPipelineDescriptor(DeviceBase* device,
         DAWN_TRY(device->ValidateObject(descriptor->layout));
     }
 
+    if (const auto* multiview = unpacked.Get<RenderPipelineMultiview>()) {
+        DAWN_INVALID_IF(!device->HasFeature(Feature::ChromiumExperimentalMultiview),
+                        "RenderPipelineMultiview can't be used without %s.",
+                        ToAPI(Feature::ChromiumExperimentalMultiview));
+        const uint32_t mask = multiview->viewMask;
+        DAWN_INVALID_IF(mask == 0 || mask > 0xFF || (mask & (mask + 1)) != 0,
+                        "RenderPipelineMultiview viewMask (0x%x) must be a non-empty run of views "
+                        "from view 0, at most 8.",
+                        mask);
+    }
+
     ShaderModuleEntryPoint vertexEntryPoint;
     DAWN_TRY_ASSIGN_CONTEXT(vertexEntryPoint,
                             ValidateVertexState(device, &descriptor->vertex, descriptor->layout,

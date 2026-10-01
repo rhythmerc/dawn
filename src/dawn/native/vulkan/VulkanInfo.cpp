@@ -393,6 +393,9 @@ ResultOrError<VulkanDeviceInfo> GatherDeviceInfo(const PhysicalDevice& device) {
                           VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR);
     }
 
+    // Multiview is core in Vulkan 1.1, Dawn's minimum.
+    featuresChain.Add(&info.multiviewFeatures, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES);
+
     if (info.extensions[DeviceExt::PhysicalDeviceDrm]) {
         propertiesChain.Add(&info.drmProperties,
                             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRM_PROPERTIES_EXT);

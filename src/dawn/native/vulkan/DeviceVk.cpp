@@ -710,6 +710,16 @@ ResultOrError<VulkanDeviceKnobs> Device::CreateDevice(VkPhysicalDevice vkPhysica
         usedKnobs.dynamicRenderingFeatures = mDeviceInfo.dynamicRenderingFeatures;
         featuresChain.Add(&usedKnobs.dynamicRenderingFeatures);
         mRenderPassType = VulkanRenderPassType::DynamicRendering;
+        if (HasFeature(Feature::ChromiumExperimentalMultiview)) {
+            usedKnobs.multiviewFeatures = mDeviceInfo.multiviewFeatures;
+            usedKnobs.multiviewFeatures.multiviewGeometryShader = VK_FALSE;
+            usedKnobs.multiviewFeatures.multiviewTessellationShader = VK_FALSE;
+            featuresChain.Add(&usedKnobs.multiviewFeatures);
+        }
+    } else if (HasFeature(Feature::ChromiumExperimentalMultiview)) {
+        return DAWN_VALIDATION_ERROR("%s needs the dynamic rendering path, which %s turns off.",
+                                     ToAPI(Feature::ChromiumExperimentalMultiview),
+                                     ToAPI(Feature::DawnLoadResolveTexture));
     } else if (IsToggleEnabled(Toggle::VulkanUseCreateRenderPass2)) {
         // If dynamic rendering is not used, but CreateRenderPass2 is supported prefer it.
         mRenderPassType = VulkanRenderPassType::CreateRenderPass2;

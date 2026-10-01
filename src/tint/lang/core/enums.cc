@@ -1059,6 +1059,9 @@ BuiltinValue ParseBuiltinValue(std::string_view str) {
     if (str == "vertex_index") {
         return BuiltinValue::kVertexIndex;
     }
+    if (str == "view_index") {
+        return BuiltinValue::kViewIndex;
+    }
     if (str == "workgroup_id") {
         return BuiltinValue::kWorkgroupId;
     }
@@ -1113,6 +1116,8 @@ std::string_view ToString(BuiltinValue value) {
             return "subgroup_size";
         case BuiltinValue::kVertexIndex:
             return "vertex_index";
+        case BuiltinValue::kViewIndex:
+            return "view_index";
         case BuiltinValue::kWorkgroupId:
             return "workgroup_id";
         case BuiltinValue::kWorkgroupIndex:

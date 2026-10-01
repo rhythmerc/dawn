@@ -403,6 +403,10 @@ class Printer {
                 // TODO(dsinclair): This can be others, but use geometry for now.
                 module_.PushCapability(SpvCapabilityGeometry);
                 return SpvBuiltInPrimitiveId;
+            case core::BuiltinValue::kViewIndex:
+                module_.PushExtension("SPV_KHR_multiview");
+                module_.PushCapability(SpvCapabilityMultiView);
+                return SpvBuiltInViewIndex;
             case core::BuiltinValue::kBarycentricCoord:
                 module_.PushExtension("SPV_KHR_fragment_shader_barycentric");
                 module_.PushCapability(SpvCapabilityFragmentBarycentricKHR);

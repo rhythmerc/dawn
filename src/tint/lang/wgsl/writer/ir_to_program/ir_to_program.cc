@@ -270,6 +270,10 @@ class State {
                         Enable(wgsl::Extension::kPrimitiveIndex);
                         attrs.Push(b.Builtin(core::BuiltinValue::kPrimitiveIndex));
                         break;
+                    case core::BuiltinValue::kViewIndex:
+                        Enable(wgsl::Extension::kChromiumExperimentalMultiview);
+                        attrs.Push(b.Builtin(core::BuiltinValue::kViewIndex));
+                        break;
                     default:
                         TINT_IR_UNIMPLEMENTED(mod) << builtin.value();
                 }

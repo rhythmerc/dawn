@@ -469,6 +469,12 @@ static constexpr auto kFeatureInfo = std::to_array<FeatureEnumAndInfo>({
       "https://dawn.googlesource.com/dawn/+/refs/heads/main/docs/dawn/features/"
       "unorm16_filterable.md",
       FeatureInfo::FeatureState::Experimental}},
+    {Feature::ChromiumExperimentalMultiview,
+     {"Multiview rendering (melee-xr fork): RenderPassMultiview/RenderPipelineMultiview view "
+      "masks over 2D-array attachments, and @builtin(view_index) in WGSL "
+      "(enable chromium_experimental_multiview).",
+      "https://github.com/rhythmerc/dawn/tree/melee-xr",
+      FeatureInfo::FeatureState::Experimental}},
     {Feature::RenderPassRenderArea,
      {"Supports specifying render area for render pass.",
       "https://dawn.googlesource.com/dawn/+/refs/heads/main/docs/dawn/features/"

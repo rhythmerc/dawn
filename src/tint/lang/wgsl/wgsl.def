@@ -85,6 +85,9 @@ enum extension {
 
   // A Chromium-specific extension for disabling uniformity analysis.
   chromium_disable_uniformity_analysis
+  // melee-xr fork: @builtin(view_index), the view a multiview render pass is
+  // drawing (SPIR-V ViewIndex).
+  chromium_experimental_multiview
   // A Chromium-specific extension that enables features for input
   // attachments
   chromium_internal_input_attachments

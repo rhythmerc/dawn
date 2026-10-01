@@ -27,6 +27,7 @@
 
 #include "src/dawn/native/CommandEncoder.h"
 
+#include <bit>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -109,6 +110,10 @@ std::string_view GetAttachmentTypeStr(AttachmentType type) {
 // attachment.
 class RenderPassValidationState final : public NonMovable {
   public:
+    // Multiview: attachments are 2D arrays with one layer per view.
+    void SetViewCount(uint32_t viewCount) { mViewCount = viewCount; }
+    uint32_t GetViewCount() const { return mViewCount; }
+
     // Record the attachment in the render pass if it passes all validations:
     // - the attachment has same with, height and sample count with other attachments
     // - no overlaps with other attachments
@@ -361,6 +366,7 @@ class RenderPassValidationState final : public NonMovable {
     uint32_t mRenderWidth = 0;
     uint32_t mRenderHeight = 0;
     uint32_t mSampleCount = 0;
+    uint32_t mViewCount = 1;
     bool mMsrtssAllowed = false;
 
     uint32_t mAttachmentValidationWidth = 0;
@@ -456,11 +462,20 @@ MaybeError ValidateTextureDepthStencilToBufferCopyRestrictions(const DeviceBase*
     return {};
 }
 
-MaybeError ValidateAttachmentArrayLayersAndLevelCount(const TextureViewBase* attachment) {
-    // Currently we do not support layered rendering.
-    DAWN_INVALID_IF(attachment->GetLayerCount() > 1,
-                    "The layer count (%u) of %s used as attachment is greater than 1.",
-                    attachment->GetLayerCount(), attachment);
+MaybeError ValidateAttachmentArrayLayersAndLevelCount(const TextureViewBase* attachment,
+                                                      uint32_t viewCount = 1) {
+    // Layered rendering only through multiview: one layer per view.
+    if (viewCount > 1) {
+        DAWN_INVALID_IF(attachment->GetDimension() != wgpu::TextureViewDimension::e2DArray ||
+                            attachment->GetLayerCount() != viewCount,
+                        "%s used as a multiview attachment must be a 2D array view with %u layers "
+                        "(one per view); it has %u.",
+                        attachment, viewCount, attachment->GetLayerCount());
+    } else {
+        DAWN_INVALID_IF(attachment->GetLayerCount() > 1,
+                        "The layer count (%u) of %s used as attachment is greater than 1.",
+                        attachment->GetLayerCount(), attachment);
+    }
 
     DAWN_INVALID_IF(attachment->GetLevelCount() > 1,
                     "The mip level count (%u) of %s used as attachment is greater than 1.",
@@ -752,7 +767,7 @@ MaybeError ValidateRenderPassColorAttachment(DeviceBase* device,
     }
 
     DAWN_TRY(ValidateColorAttachmentDepthSlice(attachment, colorAttachment.depthSlice));
-    DAWN_TRY(ValidateAttachmentArrayLayersAndLevelCount(attachment));
+    DAWN_TRY(ValidateAttachmentArrayLayersAndLevelCount(attachment, validationState->GetViewCount()));
 
     DAWN_TRY(validationState->AddAttachment(attachment, AttachmentType::ColorAttachment,
                                             colorAttachment.depthSlice));
@@ -881,7 +896,7 @@ MaybeError ValidateRenderPassDepthStencilAttachment(
                         unpacked->depthClearValue, attachment);
     }
 
-    DAWN_TRY(ValidateAttachmentArrayLayersAndLevelCount(attachment));
+    DAWN_TRY(ValidateAttachmentArrayLayersAndLevelCount(attachment, validationState->GetViewCount()));
 
     // TODO(450506641): Precompute allowed usages of texture views (including swizzle identity
     // check) instead of recomputing.
@@ -953,6 +968,21 @@ MaybeError ValidateRenderPassDescriptor(DeviceBase* device,
     if (renderPassSampleCount) {
         DAWN_TRY(ValidateDawnRenderPassSampleCount(device, renderPassSampleCount));
         validationState->SetExplicitSampleCount(renderPassSampleCount->sampleCount);
+    }
+
+    if (const auto* multiview = descriptor.Get<RenderPassMultiview>()) {
+        DAWN_INVALID_IF(!device->HasFeature(Feature::ChromiumExperimentalMultiview),
+                        "RenderPassMultiview can't be used without %s.",
+                        ToAPI(Feature::ChromiumExperimentalMultiview));
+        const uint32_t mask = multiview->viewMask;
+        // Views 0..n-1: attachments then need exactly n layers.
+        DAWN_INVALID_IF(mask == 0 || mask > 0xFF || (mask & (mask + 1)) != 0,
+                        "RenderPassMultiview viewMask (0x%x) must be a non-empty run of views from "
+                        "view 0, at most 8.",
+                        mask);
+        DAWN_INVALID_IF(renderPassSampleCount != nullptr,
+                        "RenderPassMultiview can't be combined with DawnRenderPassSampleCount.");
+        validationState->SetViewCount(static_cast<uint32_t>(std::popcount(mask)));
     }
 
     for (auto [i, attachment] : Enumerate(descriptor->colorAttachments)) {

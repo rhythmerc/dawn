@@ -1217,6 +1217,26 @@ bool Validator::BuiltinAttribute(const ast::BuiltinAttribute* attr,
             }
             break;
         }
+        case core::BuiltinValue::kViewIndex: {
+            if (!enabled_extensions_.Contains(wgsl::Extension::kChromiumExperimentalMultiview)) {
+                AddError(attr->source)
+                    << "use of " << style::Attribute("@builtin")
+                    << style::Code("(", style::Enum(builtin), ")")
+                    << " requires enabling extension "
+                    << style::Code("chromium_experimental_multiview");
+                return false;
+            }
+            if (!type->Is<core::type::U32>()) {
+                err_builtin_type("u32");
+                return false;
+            }
+            if (stage != ast::PipelineStage::kNone &&
+                !((stage == ast::PipelineStage::kVertex || stage == ast::PipelineStage::kFragment) &&
+                  is_input)) {
+                is_stage_mismatch = true;
+            }
+            break;
+        }
         case core::BuiltinValue::kPrimitiveIndex: {
             if (!enabled_extensions_.Contains(wgsl::Extension::kPrimitiveIndex)) {
                 AddError(attr->source)

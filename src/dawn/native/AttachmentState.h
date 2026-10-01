@@ -71,6 +71,9 @@ class AttachmentState final : public RefCounted,
     bool HasDepthStencilAttachment() const;
     wgpu::TextureFormat GetDepthStencilFormat() const;
     uint32_t GetSampleCount() const;
+    // Multiview (Feature::ChromiumExperimentalMultiview): the views drawn, one bit per layer of the
+    // attachments; 0 = not multiview.
+    uint32_t GetViewMask() const;
     const ExpandResolveInfo& GetExpandResolveInfo() const;
     bool HasPixelLocalStorage() const;
     const std::vector<wgpu::TextureFormat>& GetStorageAttachmentSlots() const;
@@ -90,6 +93,7 @@ class AttachmentState final : public RefCounted,
     // Default (texture format Undefined) indicates there is no depth stencil attachment.
     wgpu::TextureFormat mDepthStencilFormat = wgpu::TextureFormat::Undefined;
     uint32_t mSampleCount = 0;
+    uint32_t mViewMask = 0;
 
     ExpandResolveInfo mExpandResolveInfo;
 

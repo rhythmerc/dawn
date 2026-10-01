@@ -100,6 +100,10 @@ AttachmentState::AttachmentState(const UnpackedPtr<RenderPipelineDescriptor>& de
         mDepthStencilFormat = descriptor->depthStencil->format;
     }
 
+    if (auto* multiview = descriptor.Get<RenderPipelineMultiview>()) {
+        mViewMask = multiview->viewMask;
+    }
+
     mHasPLS = layout->HasPixelLocalStorage();
     mStorageAttachmentSlots = layout->GetStorageAttachmentSlots();
 
@@ -160,6 +164,10 @@ AttachmentState::AttachmentState(const UnpackedPtr<RenderPassDescriptor>& descri
     DAWN_CHECK(IsSubset(mExpandResolveInfo.attachmentsToExpandResolve,
                         mExpandResolveInfo.resolveTargetsMask));
 
+    if (auto* multiview = descriptor.Get<RenderPassMultiview>()) {
+        mViewMask = multiview->viewMask;
+    }
+
     // Gather the PLS information.
     if (auto* pls = descriptor.Get<RenderPassPixelLocalStorage>()) {
         mHasPLS = true;
@@ -188,6 +196,7 @@ AttachmentState::AttachmentState(const AttachmentState& blueprint) {
     mColorFormats = blueprint.mColorFormats;
     mDepthStencilFormat = blueprint.mDepthStencilFormat;
     mSampleCount = blueprint.mSampleCount;
+    mViewMask = blueprint.mViewMask;
     mExpandResolveInfo = blueprint.mExpandResolveInfo;
     mHasPLS = blueprint.mHasPLS;
     mStorageAttachmentSlots = blueprint.mStorageAttachmentSlots;
@@ -222,6 +231,10 @@ bool AttachmentState::EqualityFunc::operator()(const AttachmentState* a,
 
     // Check sample count
     if (a->mSampleCount != b->mSampleCount) {
+        return false;
+    }
+
+    if (a->mViewMask != b->mViewMask) {
         return false;
     }
 
@@ -276,6 +289,8 @@ size_t AttachmentState::ComputeContentHash() {
         HashCombine(&hash, slotFormat);
     }
 
+    HashCombine(&hash, mViewMask);
+
     return hash;
 }
 
@@ -295,6 +310,10 @@ bool AttachmentState::HasDepthStencilAttachment() const {
 wgpu::TextureFormat AttachmentState::GetDepthStencilFormat() const {
     DAWN_CHECK(HasDepthStencilAttachment());
     return mDepthStencilFormat;
+}
+
+uint32_t AttachmentState::GetViewMask() const {
+    return mViewMask;
 }
 
 uint32_t AttachmentState::GetSampleCount() const {

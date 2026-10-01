@@ -1781,6 +1781,10 @@ void DeviceBase::SetWGSLExtensionAllowList() {
     if (mEnabledFeatures.IsEnabled(Feature::PrimitiveIndex)) {
         mWGSLAllowedFeatures.extensions.insert(tint::wgsl::Extension::kPrimitiveIndex);
     }
+    if (mEnabledFeatures.IsEnabled(Feature::ChromiumExperimentalMultiview)) {
+        mWGSLAllowedFeatures.extensions.insert(
+            tint::wgsl::Extension::kChromiumExperimentalMultiview);
+    }
     if (mEnabledFeatures.IsEnabled(Feature::ChromiumExperimentalSamplingResourceTable)) {
         mWGSLAllowedFeatures.extensions.insert(
             tint::wgsl::Extension::kChromiumExperimentalResourceTable);

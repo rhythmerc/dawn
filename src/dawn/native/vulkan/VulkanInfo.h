@@ -79,6 +79,7 @@ struct VulkanDeviceKnobs {
     VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT
         rasterizationOrderAttachmentAccessFeatures;
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeatures;
+    VkPhysicalDeviceMultiviewFeatures multiviewFeatures;  // Vulkan 1.1 core
     VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT
         multisampledRenderToSingleSampledFeatures;
     VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures;

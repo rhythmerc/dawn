@@ -495,6 +495,13 @@ void PhysicalDevice::InitializeSupportedFeaturesImpl() {
     EnableFeature(Feature::DawnLoadResolveTexture);
     EnableFeature(Feature::RenderPassRenderArea);
 
+    // melee-xr fork: multiview through dynamic rendering's view mask.
+    if (mDeviceInfo.multiviewFeatures.multiview == VK_TRUE &&
+        mDeviceInfo.HasExt(DeviceExt::DynamicRendering) &&
+        mDeviceInfo.dynamicRenderingFeatures.dynamicRendering == VK_TRUE) {
+        EnableFeature(Feature::ChromiumExperimentalMultiview);
+    }
+
     // Enable Subgroups feature if:
     // 1. Vulkan API version is 1.1 or later, and
     // 2. subgroupSupportedStages includes compute and fragment stage bit, and
@@ -1400,6 +1407,14 @@ FeatureValidationResult PhysicalDevice::ValidateFeatureSupportedWithTogglesImpl(
                 !toggles.IsEnabled(Toggle::VulkanEnableF16OnNvidia)) {
                 return FeatureValidationResult(
                     absl::StrFormat("Feature %s is not yet supported on Nvidia GPUs", feature));
+            }
+            break;
+
+        case wgpu::FeatureName::ChromiumExperimentalMultiview:
+            // The view mask is only wired into the dynamic rendering path.
+            if (!toggles.IsEnabled(Toggle::VulkanUseDynamicRendering)) {
+                return FeatureValidationResult(absl::StrFormat(
+                    "Feature %s requires the VulkanUseDynamicRendering toggle on Vulkan", feature));
             }
             break;
 

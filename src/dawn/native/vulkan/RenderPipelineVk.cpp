@@ -783,7 +783,7 @@ ResultOrError<RenderPipeline::SpecializationResult> RenderPipeline::InitializeSp
         createInfoChain.Add(&pipelineRenderingCreateInfo,
                             VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR);
 
-        pipelineRenderingCreateInfo.viewMask = 0;
+        pipelineRenderingCreateInfo.viewMask = GetAttachmentState()->GetViewMask();
         pipelineRenderingCreateInfo.colorAttachmentCount = 0;
         pipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
         pipelineRenderingCreateInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
