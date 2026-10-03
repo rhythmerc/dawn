@@ -198,7 +198,11 @@ MaybeError LazyClearRenderPassAttachments(DeviceBase* device,
                 // TODO(500975625): Optimize this.
                 DAWN_TRY(clearTexture(texture, range));
             } else {
-                if (partialRenderArea) {
+                // A partial render area leaves the rest of an uninitialized
+                // attachment as it was, which is only a problem if the pass
+                // then stores it (and marks it initialized). Discarded
+                // contents stay uninitialized, so the area can stay partial.
+                if (partialRenderArea && attachmentInfo.storeOp == wgpu::StoreOp::Store) {
                     renderPass->forceFullRenderArea = true;
                 }
                 if (attachmentInfo.loadOp == wgpu::LoadOp::Load) {
@@ -264,7 +268,7 @@ MaybeError LazyClearRenderPassAttachments(DeviceBase* device,
                 attachmentInfo.clearDepth = 0.0f;
                 attachmentInfo.depthLoadOp = wgpu::LoadOp::Clear;
             }
-            if (partialRenderArea) {
+            if (partialRenderArea && attachmentInfo.depthStoreOp == wgpu::StoreOp::Store) {
                 renderPass->forceFullRenderArea = true;
             }
         }
@@ -274,7 +278,7 @@ MaybeError LazyClearRenderPassAttachments(DeviceBase* device,
                 attachmentInfo.clearStencil = 0u;
                 attachmentInfo.stencilLoadOp = wgpu::LoadOp::Clear;
             }
-            if (partialRenderArea) {
+            if (partialRenderArea && attachmentInfo.stencilStoreOp == wgpu::StoreOp::Store) {
                 renderPass->forceFullRenderArea = true;
             }
         }
