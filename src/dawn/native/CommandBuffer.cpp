@@ -212,7 +212,7 @@ MaybeError LazyClearRenderPassAttachments(DeviceBase* device,
 
         if (hasResolveTarget) {
             TextureViewBase* resolveView = attachmentInfo.resolveTarget.Get();
-            DAWN_CHECK(resolveView->GetLayerCount() == 1);
+            DAWN_CHECK(resolveView->GetLayerCount() == viewCount);
             DAWN_CHECK(resolveView->GetLevelCount() == 1);
             if (!resolveView->GetTexture()->IsSubresourceContentInitialized(
                     resolveView->GetSubresourceRange())) {

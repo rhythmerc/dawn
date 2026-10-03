@@ -513,9 +513,13 @@ MaybeError ValidateResolveTarget(const DeviceBase* device,
                     "The dimension (%s) of resolve target %s is not 2D or 2DArray.",
                     resolveTarget->GetDimension(), resolveTarget);
 
-    DAWN_INVALID_IF(resolveTarget->GetLayerCount() > 1,
-                    "The resolve target %s array layer count (%u) is not 1.", resolveTarget,
-                    resolveTarget->GetLayerCount());
+    // Multiview: the resolve target has a layer per view, like its attachment
+    // (whose layer count is validated against the view count); otherwise 1.
+    DAWN_INVALID_IF(resolveTarget->GetLayerCount() != attachment->GetLayerCount(),
+                    "The resolve target %s array layer count (%u) does not match the color "
+                    "attachment %s layer count (%u).",
+                    resolveTarget, resolveTarget->GetLayerCount(), attachment,
+                    attachment->GetLayerCount());
 
     DAWN_INVALID_IF(resolveTarget->GetLevelCount() > 1,
                     "The resolve target %s mip level count (%u) is not 1.", resolveTarget,
