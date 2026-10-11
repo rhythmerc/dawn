@@ -1020,7 +1020,8 @@ ResultOrError<Ref<SharedTextureMemory>> SharedTextureMemory::CreateFromVkImage(
     if (info->usage & VK_IMAGE_USAGE_STORAGE_BIT) {
         properties.usage |= wgpu::TextureUsage::StorageBinding;
     }
-    if (info->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
+    if (info->usage &
+        (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) {
         properties.usage |= wgpu::TextureUsage::RenderAttachment;
     }
 
