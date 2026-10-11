@@ -79,6 +79,12 @@ DAWN_NATIVE_EXPORT DeviceVkHandles GetDeviceVkHandles(WGPUDevice device);
 // The index'th extra queue (queue index 1 + index of Dawn's family), or VK_NULL_HANDLE.
 DAWN_NATIVE_EXPORT VkQueue GetExtraQueue(WGPUDevice device, uint32_t index);
 
+// Holds the queue's flush: Queue::Submit still records and translates its command buffers,
+// but they stay in the pending Vulkan command buffer, which nothing hands to vkQueueSubmit
+// (not even internal flushes) until released. Releasing submits what's pending. Nothing may
+// wait on the queue's work while it's held. Returns false if the release's submit failed.
+DAWN_NATIVE_EXPORT bool HoldQueueFlush(WGPUDevice device, bool hold);
+
 // Wraps an image created elsewhere on Dawn's device, e.g. an OpenXR swapchain image, as
 // SharedTextureMemory. Dawn never destroys the image or its memory. `info` describes how it was
 // created (format, extent, usage, flags). Access through BeginAccess/EndAccess with

@@ -84,6 +84,18 @@ VkQueue GetExtraQueue(WGPUDevice device, uint32_t index) {
     return queue;
 }
 
+bool HoldQueueFlush(WGPUDevice device, bool hold) {
+    Device* backendDevice = ToBackend(FromAPI(device));
+    auto deviceGuard = backendDevice->GetGuard();
+    Queue* queue = ToBackend(backendDevice->GetQueue());
+    queue->SetFlushHeld(hold);
+    if (hold) {
+        return true;
+    }
+    return !backendDevice->ConsumedError(queue->SubmitPendingCommands(),
+                                         "Submitting commands held by HoldQueueFlush");
+}
+
 WGPUSharedTextureMemory CreateSharedTextureMemoryFromVkImage(WGPUDevice device,
                                                              uint64_t image,
                                                              const VkImageCreateInfo* info,

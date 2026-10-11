@@ -50,6 +50,10 @@ class Queue final : public QueueBase {
 
     VkQueue GetVkQueue() const;
 
+    // melee-xr fork: while held, submits record and translate their commands
+    // but leave them pending; nothing reaches vkQueueSubmit until released.
+    void SetFlushHeld(bool held);
+
     CommandRecordingContext* GetPendingRecordingContext(SubmitMode submitMode = SubmitMode::Normal);
     MaybeError SplitRecordingContext(CommandRecordingContext* recordingContext);
 
@@ -69,6 +73,7 @@ class Queue final : public QueueBase {
     void ForceEventualFlushOfCommands() override;
     MaybeError WaitForIdleForDestructionImpl() override;
     MaybeError SubmitPendingCommandsImpl() override;
+    bool mFlushHeld = false;
     MaybeError RecycleRecordingContext();
     void DestroyImpl(DestroyReason reason) override;
 

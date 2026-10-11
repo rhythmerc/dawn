@@ -294,8 +294,12 @@ ResultOrError<CommandPoolAndBuffer> Queue::BeginVkCommandBuffer() {
     return commands;
 }
 
+void Queue::SetFlushHeld(bool held) {
+    mFlushHeld = held;
+}
+
 MaybeError Queue::SubmitPendingCommandsImpl() {
-    if (!mRecordingContext.needsSubmit) {
+    if (!mRecordingContext.needsSubmit || mFlushHeld) {
         return {};
     }
 
