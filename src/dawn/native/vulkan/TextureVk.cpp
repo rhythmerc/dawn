@@ -840,6 +840,8 @@ VkSampleCountFlagBits VulkanSampleCount(uint32_t sampleCount) {
     switch (sampleCount) {
         case 1:
             return VK_SAMPLE_COUNT_1_BIT;
+        case 2:
+            return VK_SAMPLE_COUNT_2_BIT;
         case 4:
             return VK_SAMPLE_COUNT_4_BIT;
     }

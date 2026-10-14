@@ -1045,9 +1045,13 @@ ResultOrError<TextureViewDescriptor> GetTextureViewDescriptorWithDefaults(
 
 // WebGPU only supports sample counts of 1 and 4. We could expand to more based on
 // platform support, but it would probably be a feature.
+// melee-xr: 2 as well, for the Vulkan backend (Quest XR eyes: half the tile
+// memory per pixel of 4x, so bigger bins on Adreno). Vulkan guarantees only 1
+// and 4 (framebufferColorSampleCounts); the caller checks the device has 2.
 bool IsValidSampleCount(uint32_t sampleCount) {
     switch (sampleCount) {
         case 1:
+        case 2:
         case 4:
             return true;
 
