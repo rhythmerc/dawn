@@ -190,7 +190,8 @@ bool IsArrayLayerValidForTextureViewDimension(wgpu::TextureViewDimension texture
     DAWN_UNREACHABLE();
 }
 
-MaybeError ValidateSampleCount(const TextureDescriptor* descriptor,
+MaybeError ValidateSampleCount(const DeviceBase* device,
+                               const TextureDescriptor* descriptor,
                                wgpu::TextureUsage usage,
                                const Format* format) {
     DAWN_INVALID_IF(!IsValidSampleCount(descriptor->sampleCount),
@@ -209,7 +210,9 @@ MaybeError ValidateSampleCount(const TextureDescriptor* descriptor,
                         "The dimension (%s) of a multisampled texture is not 2D.",
                         descriptor->dimension);
 
-        DAWN_INVALID_IF(descriptor->size.depthOrArrayLayers > 1,
+        // allow_unsafe_apis: multisampled arrays (multiview eyes; Vulkan has them).
+        DAWN_INVALID_IF(descriptor->size.depthOrArrayLayers > 1 &&
+                            !device->IsToggleEnabled(Toggle::AllowUnsafeAPIs),
                         "The depthOrArrayLayers (%u) of a multisampled texture is not 1.",
                         descriptor->size.depthOrArrayLayers);
 
@@ -251,8 +254,11 @@ MaybeError ValidateTextureViewDimensionCompatibility(
         "of %s.",
         descriptor->dimension, texture->GetDimension(), texture);
 
+    // allow_unsafe_apis: multisampled array views (multiview eyes; Vulkan has them).
     DAWN_INVALID_IF(
-        texture->GetSampleCount() > 1 && descriptor->dimension != wgpu::TextureViewDimension::e2D,
+        texture->GetSampleCount() > 1 && descriptor->dimension != wgpu::TextureViewDimension::e2D &&
+            !(descriptor->dimension == wgpu::TextureViewDimension::e2DArray &&
+              device->IsToggleEnabled(Toggle::AllowUnsafeAPIs)),
         "The dimension (%s) of the multisampled texture view is not %s.", descriptor->dimension,
         wgpu::TextureViewDimension::e2D);
 
@@ -816,8 +822,10 @@ MaybeError ValidateTextureDescriptor(
                                              std::move(allowedSharedTextureMemoryUsage)));
 
     if (usage & wgpu::TextureUsage::TransientAttachment) {
+        // allow_unsafe_apis: transient arrays (multiview eyes; Vulkan has them).
         DAWN_INVALID_IF(
-            (descriptor->size.depthOrArrayLayers != 1 || descriptor->mipLevelCount != 1),
+            (descriptor->size.depthOrArrayLayers != 1 || descriptor->mipLevelCount != 1) &&
+                !device->IsToggleEnabled(Toggle::AllowUnsafeAPIs),
             "Transient textures must have depthOrArrayLayers (%u) = 1 and mipLevelCount (%u) = 1.",
             descriptor->size.depthOrArrayLayers, descriptor->mipLevelCount);
         DAWN_INVALID_IF(!descriptor->viewFormats.empty(),
@@ -840,7 +848,7 @@ MaybeError ValidateTextureDescriptor(
         DAWN_TRY(ValidateDepthOrArrayLayersIsCompatibleWithTextureBindingViewDimension(
             textureBindingViewDimension, descriptor->size.depthOrArrayLayers));
     }
-    DAWN_TRY(ValidateSampleCount(*descriptor, usage, format));
+    DAWN_TRY(ValidateSampleCount(device, *descriptor, usage, format));
 
     DAWN_INVALID_IF(descriptor->size.width == 0 || descriptor->size.height == 0 ||
                         descriptor->size.depthOrArrayLayers == 0 || descriptor->mipLevelCount == 0,
