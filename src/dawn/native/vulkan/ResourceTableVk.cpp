@@ -120,11 +120,15 @@ MaybeError ResourceTable::Initialize() {
 
     uint32_t sampledImageCount = uint32_t{GetSizeWithDefaultResources()};
 
-    // Allocate mPool.
+    // Allocate mPool. It holds the layout's full array length, not just this table's: Adreno
+    // (Quest 3) checks a variable-count allocation against the layout's maximum and fails it
+    // with VK_ERROR_OUT_OF_POOL_MEMORY otherwise.
     {
         std::array<VkDescriptorPoolSize, 2> sizes = {
             VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1},  // The metadata buffer.
-            VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sampledImageCount},
+            VkDescriptorPoolSize{
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                kMaxResourceTableSize + uint32_t{ResourceTableDefaultResources::GetCount()}},
         };
 
         VkDescriptorPoolCreateInfo createInfo{
