@@ -480,7 +480,10 @@ ResultOrError<ShaderModule::ModuleAndSpirv> ShaderModule::GetHandleAndSpirv(
         DumpSpirv(GetDevice(), compilation->spirv);
     }
 
-    if (GetDevice()->IsToggleEnabled(Toggle::EnableSpirvValidation)) {
+    // SPIR-V from the blob cache was validated before it was stored (EnsureStored below), and
+    // the blob's hash is checked on load. Validating it again cost a Quest 3 ~2 ms a shader
+    // module, 21 s of a warm boot's 34 s of pipeline creation.
+    if (GetDevice()->IsToggleEnabled(Toggle::EnableSpirvValidation) && !compilation.IsCached()) {
         SCOPED_DAWN_HISTOGRAM_TIMER_MICROS(GetDevice()->GetPlatform(), "Vulkan.ValidateSpirv");
 
         // Validate and if required dump the compiled SPIR-V code.
