@@ -118,7 +118,13 @@ MaybeError ResourceTable::Initialize() {
 
     Device* device = ToBackend(GetDevice());
 
-    uint32_t sampledImageCount = uint32_t{GetSizeWithDefaultResources()};
+    // The set is allocated with the layout's full array length too, not just this table's:
+    // Adreno (Quest 3) corrupted memory with a smaller variable count. Bindless eye batches with
+    // an 8192-slot table crashed 5-6 boots in 40 at the first descriptor updates (in Dawn's
+    // resource table, command recording, even another library's thread); at the full 16384,
+    // 0 in 40. Only this table's slots and default resources are ever written.
+    uint32_t sampledImageCount =
+        kMaxResourceTableSize + uint32_t{ResourceTableDefaultResources::GetCount()};
 
     // Allocate mPool. It holds the layout's full array length, not just this table's: Adreno
     // (Quest 3) checks a variable-count allocation against the layout's maximum and fails it
