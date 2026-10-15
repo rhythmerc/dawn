@@ -872,8 +872,10 @@ ResultOrError<RenderPipeline::SpecializationResult> RenderPipeline::InitializeSp
     // If possible, specify where exactly robustness should be added in the pipeline. This is
     // necessary because when bindless is enabled and robustBufferAccessUpdateAfterBind is false, we
     // must only set robust buffer access on vertexInputs.
+    // The extension alone isn't enough: Adreno (Quest 3) has it without the feature.
     VkPipelineRobustnessCreateInfo robustnessCreateInfo;
-    if (device->GetDeviceInfo().HasExt(DeviceExt::PipelineRobustness)) {
+    if (device->GetDeviceInfo().HasExt(DeviceExt::PipelineRobustness) &&
+        device->GetDeviceInfo().pipelineRobustnessFeatures.pipelineRobustness) {
         createInfoChain.Add(&robustnessCreateInfo,
                             VK_STRUCTURE_TYPE_PIPELINE_ROBUSTNESS_CREATE_INFO);
 

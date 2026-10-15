@@ -1679,9 +1679,9 @@ void ImportedTextureBase::DestroyImpl(DestroyReason reason) {
 void ImportedTextureBase::TransitionEagerlyForExport(CommandRecordingContext* recordingContext) {
     mExternalState = ExternalState::EagerlyTransitioned;
 
-    // Get any usage, ideally the last one to do nothing
-    DAWN_ASSERT(GetNumMipLevels() == 1 && GetArrayLayers() == 1);
-    const SubresourceRange range = {GetDisjointVulkanAspects(), {0, 1}, {0, 1}};
+    // Get any usage, ideally the last one to do nothing. Every layer and level: an imported
+    // array (multiview eyes) released with layer 0 alone leaves the others unreleased.
+    const SubresourceRange range = GetAllSubresources();
     const TextureSyncInfo syncInfo = mSubresourceLastSyncInfos.Get(range.aspects, 0, 0);
 
     std::vector<VkImageMemoryBarrier> barriers;
@@ -1692,19 +1692,20 @@ void ImportedTextureBase::TransitionEagerlyForExport(CommandRecordingContext* re
     TransitionUsageAndGetResourceBarrier(syncInfo.usage, syncInfo.shaderStages, range, &barriers,
                                          &srcStages, &dstStages);
 
-    DAWN_ASSERT(barriers.size() == 1);
-    VkImageMemoryBarrier& barrier = barriers[0];
-    // The barrier must be paired with another barrier that will specify the dst access mask on the
-    // importing queue.
-    barrier.dstAccessMask = 0;
-
-    if (mDesiredExportLayout != VK_IMAGE_LAYOUT_UNDEFINED) {
-        barrier.newLayout = mDesiredExportLayout;
-    }
-
+    DAWN_ASSERT(!barriers.empty());
     Device* device = ToBackend(GetDevice());
-    barrier.srcQueueFamilyIndex = device->GetGraphicsQueueFamily();
-    barrier.dstQueueFamilyIndex = mExportQueueFamilyIndex;
+    for (VkImageMemoryBarrier& barrier : barriers) {
+        // The barrier must be paired with another barrier that will specify the dst access mask
+        // on the importing queue.
+        barrier.dstAccessMask = 0;
+
+        if (mDesiredExportLayout != VK_IMAGE_LAYOUT_UNDEFINED) {
+            barrier.newLayout = mDesiredExportLayout;
+        }
+
+        barrier.srcQueueFamilyIndex = device->GetGraphicsQueueFamily();
+        barrier.dstQueueFamilyIndex = mExportQueueFamilyIndex;
+    }
 
     // We don't know when the importing queue will need the texture, so pass
     // VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT to ensure the barrier happens-before any usage in the
@@ -1712,7 +1713,8 @@ void ImportedTextureBase::TransitionEagerlyForExport(CommandRecordingContext* re
     dstStages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
     device->fn.CmdPipelineBarrier(recordingContext->commandBuffer, srcStages, dstStages, 0, 0,
-                                  nullptr, 0, nullptr, 1, &barrier);
+                                  nullptr, 0, nullptr, static_cast<uint32_t>(barriers.size()),
+                                  barriers.data());
 }
 
 bool ImportedTextureBase::CanReuseWithoutBarrier(wgpu::TextureUsage lastUsage,
@@ -1726,8 +1728,6 @@ bool ImportedTextureBase::CanReuseWithoutBarrier(wgpu::TextureUsage lastUsage,
 void ImportedTextureBase::TweakTransition(CommandRecordingContext* recordingContext,
                                           std::vector<VkImageMemoryBarrier>* barriers,
                                           size_t transitionBarrierStart) {
-    DAWN_ASSERT(GetNumMipLevels() == 1 && GetArrayLayers() == 1);
-
     mLastSharedTextureMemoryUsageSerial = GetDevice()->GetQueue()->GetPendingCommandSerial();
 
     // transitionBarrierStart specify the index where barriers for current transition start in
@@ -1739,12 +1739,19 @@ void ImportedTextureBase::TweakTransition(CommandRecordingContext* recordingCont
         mExternalState == ExternalState::EagerlyTransitioned) {
         recordingContext->specialSyncTextures.insert(this);
         if (barriers->size() == transitionBarrierStart) {
+            // Every layer: an imported array (multiview eyes) left with layer 0 alone
+            // acquired keeps the others in whatever layout the producer left them.
             barriers->push_back(BuildMemoryBarrier(
                 this, wgpu::TextureUsage::None, wgpu::TextureUsage::None,
-                SubresourceRange::SingleMipAndLayer(0, 0, GetDisjointVulkanAspects())));
+                SubresourceRange::MakeFull(GetDisjointVulkanAspects(), GetArrayLayers(),
+                                           GetNumMipLevels())));
         }
 
         VkImageMemoryBarrier* barrier = &(*barriers)[transitionBarrierStart];
+        barrier->subresourceRange.baseMipLevel = 0;
+        barrier->subresourceRange.levelCount = GetNumMipLevels();
+        barrier->subresourceRange.baseArrayLayer = 0;
+        barrier->subresourceRange.layerCount = GetArrayLayers();
         // Transfer texture from external queue to graphics queue
         barrier->srcQueueFamilyIndex = mExportQueueFamilyIndex;
         barrier->dstQueueFamilyIndex = ToBackend(GetDevice())->GetGraphicsQueueFamily();
@@ -1814,7 +1821,6 @@ void ImportedTextureBase::TweakTransition(CommandRecordingContext* recordingCont
 MaybeError ImportedTextureBase::EndAccess(ExternalSemaphoreHandle* handle,
                                           VkImageLayout* releasedOldLayout,
                                           VkImageLayout* releasedNewLayout) {
-    DAWN_ASSERT(GetNumMipLevels() == 1 && GetArrayLayers() == 1);
 
     // Release the texture
     mExternalState = ExternalState::Released;

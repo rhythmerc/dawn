@@ -673,7 +673,9 @@ wgpu::TextureUsage AddInternalUsages(const DeviceBase* device,
     bool applyAlwaysResolveIntoZeroLevelAndLayerToggle =
         device->IsToggleEnabled(Toggle::AlwaysResolveIntoZeroLevelAndLayer) &&
         (arrayLayerCount > 1 || mipLevelCount > 1) &&
-        (internalUsage & wgpu::TextureUsage::RenderAttachment);
+        (internalUsage & wgpu::TextureUsage::RenderAttachment) &&
+        // A transient attachment is never a resolve target and can't take copies.
+        !(internalUsage & wgpu::TextureUsage::TransientAttachment);
     if (applyAlwaysResolveIntoZeroLevelAndLayerToggle) {
         internalUsage |= wgpu::TextureUsage::CopySrc | wgpu::TextureUsage::CopyDst;
     }
