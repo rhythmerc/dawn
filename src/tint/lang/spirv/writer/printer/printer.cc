@@ -296,6 +296,20 @@ class Printer {
     /// The current function that is being emitted.
     Function current_function_;
 
+    /// melee-xr: IDs decorated NonUniform: access chains into a resource table
+    /// with a non-constant index, and what is loaded or built from them. An
+    /// index that varies within a draw (a batched draw whose sub-draws use
+    /// different textures) is only valid in Vulkan with the decoration.
+    Hashset<uint32_t, 16> nonuniform_ids_;
+
+    void MarkNonUniform(uint32_t id) {
+        if (nonuniform_ids_.Add(id)) {
+            module_.PushCapability(SpvCapabilityShaderNonUniform);
+            module_.PushCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);
+            module_.PushAnnot(spv::Op::OpDecorate, {id, U32Operand(SpvDecorationNonUniform)});
+        }
+    }
+
     bool zero_init_workgroup_memory_ = false;
 
     /// Builds the SPIR-V from the IR
@@ -1219,10 +1233,16 @@ class Printer {
 
         if (ty->Is<core::type::Pointer>()) {
             // Use OpAccessChain for accesses into pointer types.
+            bool dynamic = false;
             for (auto* idx : access->Indices()) {
                 operands.push_back(GetAccessChainIndexId(idx));
+                dynamic |= !idx->Is<core::ir::Constant>();
             }
             current_function_.PushInst(spv::Op::OpAccessChain, std::move(operands));
+            auto* from = access->Object()->Type()->As<core::type::Pointer>();
+            if (dynamic && from && from->StoreType()->Is<core::type::ResourceTable>()) {
+                MarkNonUniform(id);
+            }
             return;
         }
 
@@ -1842,10 +1862,16 @@ class Printer {
                 TINT_IR_ICE(ir_) << "undefined spirv ir function";
         }
 
+        bool nonuniform = false;
         for (auto* arg : builtin->Args()) {
             operands.push_back(Value(arg));
+            nonuniform |= nonuniform_ids_.Contains(Value(arg));
         }
         current_function_.PushInst(op, operands);
+        if (nonuniform && (op == spv::Op::OpSampledImage || op == spv::Op::OpImage) &&
+            !builtin->Result()->Type()->Is<core::type::Void>()) {
+            MarkNonUniform(id);
+        }
     }
 
     /// Emit an OpCopyLogical instruction.
@@ -2516,6 +2542,9 @@ class Printer {
                                    {Type(load->Result()->Type()), Value(load), Value(load->From()),
                                     U32Operand(MemoryAccessMaskForPointer(
                                         load->From()->Type()->As<core::type::Pointer>()))});
+        if (nonuniform_ids_.Contains(Value(load->From()))) {
+            MarkNonUniform(Value(load));
+        }
     }
 
     /// Emit a load vector element instruction.
